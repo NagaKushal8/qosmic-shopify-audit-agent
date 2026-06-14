@@ -1,0 +1,26 @@
+# --- Python virtual environment (reproduced via tools/setup_env.py) ---
+.venv/
+venv/
+ENV/
+
+# --- Crawl output / evidence artifacts (regenerated per run) ---
+evidence/
+artifacts/
+
+# --- Python caches ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Playwright / browser caches (installed via setup) ---
+ms-playwright/
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
