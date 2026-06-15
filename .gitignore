@@ -7,6 +7,9 @@ ENV/
 evidence/
 artifacts/
 
+# --- Eval results store (regenerated per run) ---
+eval/results/
+
 # --- Python caches ---
 __pycache__/
 *.py[cod]

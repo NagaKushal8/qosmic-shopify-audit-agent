@@ -117,10 +117,23 @@
 - 🟡 **Executive summary can be `unavailable`** if the LLM can't synthesize a valid
   structured summary — rendered as an honest note rather than faked.
 
-## Phase 4 — Eval *(not built yet — anticipated)*
-- 🟡 **LLM-judge variance / generality** across unseen stores; rubric calibration
-  drift. *Planned mitigation: versioned rubric + programmatic floor.*
+## Phase 4 — Eval system (built, D24)
+- 🟢 **Hallucinated evidence** — caught deterministically (citation existence + a hard
+  gate); can't be averaged away.
+- 🟡 **Grounding/genericness are agent-judged (D25).** Done via the `eval` skill (no
+  API key). If the eval is run as bare `tools/eval.py` without the agent doing the
+  judge step, those two dims stay `unavailable` and the scalar uses the deterministic
+  dims only (honest, thinner signal).
+- 🟡 **Grounding judge variance.** Even caged to yes/no, the vision judge can be wrong
+  on ambiguous screenshots; single-vote (no N-way adversarial verify yet).
+- 🟡 **Coverage is per surface-TYPE, not per-page**, and "plausibly applies" is the
+  fixed preset map — a legitimately-barren surface can still flag as a gap.
+- 🟡 **Scalar weights are a judgment call** (grounding 0.40, …), validated only against
+  a sabotaged copy — not learned from outcomes.
+- 🔴 **Real lift is not measured.** The eval scores "is the finding true/grounded," NOT
+  "would shipping it win." True north star needs merchant A/B outcomes fed back — the
+  thing that closes the loop for real (named in EVAL_LOOP.md).
 
 ---
 
-_Last updated: 2026-06-14 (D22 stealth + browser gate-escalation — Cloudflare/WAF fallback)._
+_Last updated: 2026-06-14 (D24 eval system — layered, vector-first; real-lift gap named)._

@@ -389,7 +389,51 @@
   other `tools/*.py`) remove both failure modes and are cross-shell safe. (Pillar
   playbook casing fixed for case-sensitive OS portability.)
 
-## D3 — Eval system shape  *(OPEN — headline deliverable)*
+## D24 — Eval harness: layered, vector-first, comparator-driven (resolves D3)  *(LOCKED)*
+- **Status:** Locked · 2026-06-14 · **supersedes D3** (the open recommendation)
+- **Decision:** A separate `eval/` harness scoring reports with no golden answer:
+  - **Deterministic layers (no LLM):** structural (`eval/structural.py`, builds on
+    `validate_report_set` + sections + `pillar_balance`), citation existence
+    (`eval/grounding.py`), coverage (`eval/coverage.py`, uses the `pillars.py` preset).
+  - **Caged LLM judge (`eval/judge.py`):** grounded claim-vs-screenshot yes/no +
+    genericness, each a single-question JSON call. **Python + Anthropic API**, lazy
+    imported; if no `anthropic`/`ANTHROPIC_API_KEY`, those dims report `unavailable`
+    (never faked) and deterministic layers still score.
+  - **Scoring (`eval/score.py`):** gates (hallucinated citation / missing pillar / ≠10
+    → capped) → **vector** {grounding, specificity, coverage, structural, balance} →
+    weighted scalar (grounding 0.40) for ranking only.
+  - **Comparator (`eval/compare.py`)** for relative scoring; **meta-validation
+    (`eval/validate_eval.py`)** asserts a real run out-scores a sabotaged copy.
+  - CLI `tools/eval.py`; results cached in `eval/results/<run>.json`; autonomy plan in
+    `EVAL_LOOP.md`.
+- **Reasoning:** Inspired by the user-provided design. The hard constraint (unseen
+  stores, no golden) forces: trustworthy layers are dumb Python; the LLM is boxed into
+  narrow yes/no; the output is a vector (drives the loop) not a vibe-score; ranking is
+  relative; the eval is validated against a sabotaged copy before we trust it. Reads
+  our existing structured `report/*.json` + `manifest.json` directly — no prose parsing.
+- **Adaptations to our config:** our schema (confidence 0–100, evidence = single path,
+  expected_lift = string); citation check maps to manifest `pages[].*_path`; coverage
+  is per surface-TYPE (10 experiments can't engage 30 surfaces); grounding
+  meta-validation uses a self-produced run (we lack target_report.md's screenshots).
+- **Honest gap (Loom):** measures "is the finding true/grounded," NOT "would it win" —
+  real lift needs merchant A/B outcomes fed back, the true north star (see EVAL_LOOP.md).
+
+## D25 — Eval judge is a SKILL, not an API dependency  *(LOCKED · refines D24)*
+- **Status:** Locked · 2026-06-14
+- **Decision:** The eval's two LLM judgments (grounded claim-vs-screenshot, genericness)
+  are performed by the **agent via an `eval` skill**, not a scripted API call. Flow:
+  `tools/eval.py <run>` runs deterministic layers + emits `…judge_tasks.json`; the
+  agent judges each (writing `…judge.json`); `tools/eval.py <run> --judge …judge.json`
+  folds them into the final vector/scalar. Invoked as **"evaluate evidence/<run>"**,
+  mirroring "audit <url>". Removed `anthropic` from requirements (scripted API path
+  kept optional + lazy in `judge.py`). `EVAL_LOOP.md` is **authored by the user** — the
+  agent does not write it.
+- **Reasoning:** User direction — keep the eval consistent with the rest of the harness
+  (skill-driven, "any coding agent," no baked API key) instead of a separate SDK/key
+  dependency. The deterministic layers stay Python (trustworthy); only the two narrow
+  judgments are agent work, caged to single-question verdicts.
+
+## D3 — Eval system shape  *(SUPERSEDED by D24)*
 - **Status:** Open · 2026-06-14 · settle at start of Part 2
 - **Recommendation:** **Hybrid** — deterministic checks + LLM-judge rubric.
   - *Deterministic:* exactly 10 experiments? all 5 pillars present? every evidence

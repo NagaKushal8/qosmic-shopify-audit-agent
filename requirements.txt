@@ -7,6 +7,8 @@ beautifulsoup4==4.12.3   # HTML parsing: link extraction, metadata
 lxml==5.3.0              # fast parser backend for bs4 / XML
 playwright==1.48.0       # headless browser: screenshots + rendered DOM (capture phase)
 Pillow==10.4.0           # image inspection for image-optimization tech check
+# (eval judge is agent-driven via the `eval` skill — no API SDK required.
+#  Optional: `pip install anthropic` to enable the scripted API judge path instead.)
 
 # --- dev / test ---
 pytest==8.3.3            # test runner

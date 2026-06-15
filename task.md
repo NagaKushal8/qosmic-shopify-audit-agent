@@ -107,9 +107,25 @@
 ### Validated by a real run
 - [x] zenrojas.com end-to-end: 30 surfaces, 13 candidates → 10 valid experiments (all 5 pillars), web-search competitors (4 domains verified), summary — all validated clean. Errors seen were inline-Python ergonomics (now fixed), not pipeline logic.
 
-### Pending
-- [ ] sample_output/ — copy the zenrojas + a gingerpeople report.md once finalized
-- [ ] Phase 4 (Eval — headline) still to come
+## Phase 4 — Eval system (HEADLINE) — BUILT (user to run) (D24)
+- [x] T4.1 — `eval/loader.py` — read run's structured artifacts (no prose parsing)
+- [x] T4.2 — `eval/structural.py` — Layer 1 (schema + sections + pillar_balance)
+- [x] T4.3 — `eval/grounding.py` — Layer 2a citation existence (catches hallucinated evidence)
+- [x] T4.4 — `eval/coverage.py` — Layer 3 (high-value surfaces × plausible pillars)
+- [x] T4.5 — `eval/judge.py` → **changed: judge is agent-driven via the `eval` skill (D25)**; `build_tasks` + `from_agent_verdicts` added; scripted API path kept optional/lazy
+      - Reason: user wants the eval consistent with the harness (skill-driven, no API key). `tools/eval.py` emits judge tasks → agent judges → `--judge` folds verdicts in.
+- [x] T4.6 — `eval/score.py` — gates → vector → weighted scalar (ranking only)
+- [x] T4.7 — `eval/compare.py` — relative scoring (the improvement engine)
+- [x] T4.8 — `eval/validate_eval.py` — meta-validation (real > sabotaged)
+- [x] T4.9 — `tools/eval.py` CLI + `eval/results/` store
+- [x] T4.10 — `test_eval.py` (deterministic layers: balance, citations, coverage, gates, meta-val) — **user runs**
+- [x] T4.11 — `.claude/skills/eval/SKILL.md` — "evaluate evidence/<run>" (agent-driven judge, D25)
+- [ ] T4.12 — **`EVAL_LOOP.md` — authored by the USER** (agent draft removed per request)
+- [ ] T4.13 — user runs eval on the zenrojas run + `--validate`; feedback → iterate
+
+## Phase 5 — Wrap (remaining)
+- [ ] sample_output/ — zenrojas + gingerpeople report.md
+- [ ] WORKFLOWS.md (≤1 page) + Loom
 
 ### Pending
 - [ ] T2.10 — user runs crawl+digest+pytest; feedback → iterate

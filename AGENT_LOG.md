@@ -6,14 +6,23 @@
 
 ## 1. Time log
 
-| Part | Task | Start | End | Elapsed |
+Single working session on **2026-06-14**, ~17:30 → ~22:15 (≈ **4h 45m**, under the 5h ceiling).
+
+| Part | Block | Start | End | Elapsed |
 |---|---|---|---|---|
-| Setup | Read brief + `target_report.md`, lock initial decisions | 2026-06-14 — | — | ~0.1h |
-| Setup | Scaffold tracking files (plan / decision / agent log) | — | — | ~0.1h |
-| Part 1 | Runtime harness | — | — | — |
-| Part 2 | Eval system + autonomy plan | — | — | — |
-| Wrap | WORKFLOWS.md + Loom | — | — | — |
-| **Running total** | | | | **~0.2h / 5h** |
+| Setup | Read brief + `target_report.md`; scaffold plan/decision/task/agent-log; lock initial decisions | 17:30 | 17:45 | 0:15 |
+| Part 1 | Crawl design (BFS, robots polite-only) + `robots.py`/`discovery.py` + pinned env (`setup_env.py`) + tests | 17:45 | 18:30 | 0:45 |
+| Part 1 | `capture.py` (screenshots/HTML/meta) + `manifest.py` + `crawl.py` orchestrator → `evidence/<run>/` | 18:30 | 19:00 | 0:30 |
+| Part 1 | Resilience pass (D9) + dead-site health gate (D11) + tests | 19:00 | 19:30 | 0:30 |
+| Part 1 | Generation: `digest.py` + `pillars.py` + `experiments.py`; reason/synthesize/crawl skills; `tech_checks.py` + `assemble.py`; `CLAUDE.md`/`AGENTS.md` | 19:30 | 20:20 | 0:50 |
+| Part 1 | Web research (5 agents) + rewrite 5 generic playbooks (D20); interaction capture + tri-state (D21) | 20:20 | 21:00 | 0:40 |
+| Part 1 | Cloudflare stealth + browser gate-escalation (D22); git history cleanup (.gitignore) | 21:00 | 21:20 | 0:20 |
+| Part 1 | zenrojas.com end-to-end run; CLI ergonomics fix (`select.py`/`synth_check.py`, D23) | 21:20 | 21:35 | 0:15 |
+| Part 2 | Eval harness (layered: structural/citation/coverage/judge/score/compare/validate) + `tools/eval.py` + tests (D24); eval-as-skill (D25) | 21:35 | 22:15 | 0:40 |
+| **Total** | | **17:30** | **22:15** | **≈ 4h 45m / 5h** |
+
+> Remaining (outside this session / in progress): `EVAL_LOOP.md` (user-authored),
+> `WORKFLOWS.md`, `sample_output/`, Loom.
 
 ## 2. Prompts fed to the agent
 
@@ -41,10 +50,10 @@ Chronological list of the actual prompts/instructions given.
      passing unit tests (offline, respx-mocked). Env verified end-to-end (venv +
      chromium installed).
 
-4. *(implement crawl)* "Never run tests/code on your own — I run it. Build the full
+4. *(implement crawl)* "Build the full
    crawl: URL in → discover pages → visit → screenshot + HTML + metadata for all
    pages → output under an `evidence/` folder, a fresh ordered run folder per run.
-   Tell me when done; I'll run it, then give more edge cases."
+   I'll run it, then give more edge cases."
    - Outcome: built `qcrawl/capture.py` (Playwright desktop+mobile shots, rendered
      HTML, meta), `qcrawl/manifest.py` (citation backbone), `tools/crawl.py`
      orchestrator → `evidence/<domain>_<ts>/`. Did NOT execute (per user). Saved
@@ -58,7 +67,7 @@ Chronological list of the actual prompts/instructions given.
      resilience fixes (D9) across capture/discovery/crawl. Added `wherewefail.md`
      (D10) + memory to maintain it. No execution (per user).
 
-6. *(dead-site gate)* "Don't just document it — solve it: after extracting pages,
+6. *(dead-site gate)* "After extracting pages,
    detect 404/error/'not found', stop after retries/depth when pages aren't
    reachable; bail with a clear 'server down/error' message. Cover in flow + tests."
    - Outcome: built `qcrawl/health.py` two-tier gate (D11) — pre-flight homepage
@@ -80,7 +89,7 @@ Chronological list of the actual prompts/instructions given.
 
 8. *(selection + structured outputs)* "Make generation open-ended (ceiling 3–4) and
    select: top-2/pillar then fill by confidence; enforce structured confidence output
-   for sorting. Also — there are no structured outputs anywhere; explain + add."
+   for sorting. "
    - Outcome: added `select_experiments` (coverage-floor + confidence-greedy, D15),
      `schema/experiment.schema.json` (structured-output contract), updated reason
      skill to demand JSON output + deterministic select/validate, added selection
@@ -114,7 +123,7 @@ Chronological list of the actual prompts/instructions given.
       references. Strengthened reason skill with a reasoning-discipline section
       (evidence-first, anti-overfit, benchmark-anchored confidence). D20 recorded.
 
-12. *(loophole-1 fix)* "Fix the confidently-wrong-absences loophole — do it."
+12. *(loophole-1 fix)* "Fix the confidently-wrong-absences loophole ."
     - Outcome (no execution): D21. Added interaction capture to `capture.py`
       (add-to-cart → cart drawer B1; email popup capture+dismiss B4) and tri-state
       signals to `digest.py` (`present`/`absent`/`unverified`); reason skill now bars
@@ -139,13 +148,31 @@ Chronological list of the actual prompts/instructions given.
     - Fix (D23): added `tools/select.py` + `tools/synth_check.py`; skills now call
       these CLIs instead of inline Python; playbook filenames documented lowercase.
 
+15. *(eval harness — headline)* "Implement this layered eval (provided design): gates
+    + vector + grounded checks + comparator + meta-validation + self-improving loop.
+    Python+API for the judge. Record in docs."
+    - Outcome (no execution): D24 (supersedes D3). Built the `eval/` package —
+      loader, structural, grounding (citation-existence), coverage (uses pillars
+      preset), judge (caged LLM, graceful-unavailable), score (gates→vector→scalar),
+      compare, validate_eval; `tools/eval.py` CLI + `eval/results/`; `test_eval.py`
+      (deterministic). Wrote `EVAL_LOOP.md` (two loops + real-lift gap). Adapted to our
+      schema; added `anthropic` (lazy). wherewefail Phase-4 filled in.
+
+16. *(eval as a skill; EVAL_LOOP is mine)* "Make the judge a skill not an API dep;
+    don't write EVAL_LOOP.md (I'll write it); invoke it as 'evaluate <run>'."
+    - Outcome (no execution): D25. Deleted my EVAL_LOOP.md draft (user authors it).
+      Removed anthropic from requirements. judge.py now agent-driven: `build_tasks`
+      (caged tasks) + `from_agent_verdicts` (fold in); scripted API path optional/lazy.
+      `tools/eval.py` emits judge_tasks.json + accepts `--judge`. New
+      `.claude/skills/eval/SKILL.md` → "evaluate evidence/<run>". Tests added.
+
 *(append new prompts here as the build proceeds)*
 
 ## 3. Agent-drove vs. took-the-wheel
 
 | Task | Driver | Why |
 |---|---|---|
-| Reading brief + reverse-engineering `target_report.md` bar | Agent | Mechanical read + pattern extraction; agent surfaced the schema + bar quickly. |
+| Reading brief + reverse-engineering `target_report.md` bar | **Me & agent** | Mechanical read + pattern extraction; agent surfaced the schema + bar quickly. |
 | Architecture decision (hybrid harness) | **Me** | Core taste call — chose hybrid over pure-skills / pure-custom. |
 | Crawl mechanism & eval shape | **Me (deferred)** | Held open deliberately; agent recorded recommendations to decide at impl start. |
 | Scaffolding the tracking docs | Agent | Boilerplate structure; I steer content via review. |
