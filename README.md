@@ -107,6 +107,11 @@ layered and mostly *not* an LLM:
 | `schema/` | Structured-output contracts (experiment/summary/competitors) |
 | `sample_output/` | The zenrojas.com audit + eval scorecard |
 
+## 4. Flow diagram
+
+<img width="2229" height="7178" alt="qosmic_full_workflow" src="https://github.com/user-attachments/assets/3faf4ab8-fb4c-4f9c-84ba-173bc69a3b1f" />
+
+
 ## Run
 
 ```powershell
