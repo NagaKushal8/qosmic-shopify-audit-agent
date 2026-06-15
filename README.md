@@ -1,96 +1,115 @@
-# Qosmic — founding engineer take-home
+# Qosmic — Runtime Audit Harness + Eval System
 
-Qosmic is trying to figure out what an engineering org looks like when most of the work is done by coding agents. A handful of humans steering. Maximum delegation, but reliable — no slop, no half-shipped features. We're hiring the first engineer to build the harness that makes this real.
+A runtime harness that turns any coding agent (Claude Code / Codex) into the Qosmic
+CRO audit agent: **point it at a Shopify URL → a cited audit report**. Plus a
+**separate eval harness** that scores any audit report with no golden answer.
 
-There are two harnesses we care about:
+Two independent commands, never chained:
+- `audit <url>` → produces the report.
+- `evaluate evidence/<run>` → scores a finished report.
 
-- The **internal coding-agent harness** that lets Claude Code / Codex / future agents ship product into our repo autonomously.
-- The **runtime harness** that turns any coding agent into Qosmic's runtime audit agent — the one that inspects Shopify storefronts and produces CRO audits for our merchants.
+## Recordings
+- 🎥 **Audit walkthrough (zenrojas.com):** _<add screen-recording link>_
+- 🎥 **Eval walkthrough (zenrojas.com):** _<add screen-recording link>_
 
-This assignment is about the second one, plus the eval system around it.
-
-Heads-up before you dive in: this is an ambitious 4 hours. That's deliberate — we want to see how you think when the scope is bigger than the time. There's no single right answer, and we've left a lot of decisions to you on purpose.
-
----
-
-## The brief
-
-**Timebox:** ~4 hours total. Self-report time in `AGENT_LOG.md`. Hard ceiling 5.
-
-**What you're building:**
-
-1. A **runtime harness** that, handed to any coding agent (Claude Code, Codex, anything else), makes that agent simulate being the Qosmic audit agent itself. Point it at a Shopify URL → audit report at the bar of `target_report.md`.
-2. An **eval system** around it + a plan for how that eval system becomes autonomous and self-learning over time.
-
-## The contract
-
-**Input:** a single Shopify storefront URL. Nothing else — no manual data, no extra config.
-
-**Output:** one audit report file (`.md` or `.html`) containing exactly:
-
-1. **Executive summary** — 2-3 paragraphs of prose. The highest-level read on what's costing the store sales right now.
-2. **10 proposed experiments** — each with: title + exp-id, pillar (Conversion / AOV / Retention / Acquisition / Performance), affected surface + URL, evidence (screenshot path or URL), hypothesis, primary change, primary KPI, decision rule, expected lift range, confidence %. The 10 should span all 5 pillars.
-3. **Competitor analysis** — a table comparing the store to 3-4 competitors on positioning, what they make easier, and patterns to adapt.
-4. **Technical checks** — a table of ~15 standard storefront checks (SSL, HTTPS redirect, sitemap, robots.txt, critical pages loading, meta tags, structured data, favicon, mobile-friendly, mobile + desktop page speed, broken links, image optimization, cookie/privacy, checkout reachable). Each with status (Pass / Warn / Fail) and a one-line detail.
-
-Your harness has to produce this for any Shopify store, not just gingerpeople. See `target_report.md` for what each section should feel like.
-
-## How a Qosmic audit works, roughly
-
-Every audit goes through three phases:
-
-1. **Crawl** — visit the storefront and capture artifacts: screenshots and page contents from a representative set of surfaces (homepage, product pages, a collection or two, cart, key content pages like FAQ / Where To Buy / blog).
-2. **Reason** — over those artifacts, identify revenue leaks across five pillars (Conversion, AOV, Retention, Acquisition, Performance) and construct experiments with explicit hypotheses, evidence citations, and clear control/variant changes.
-3. **Write** — produce the structured report you see in `target_report.md`: executive summary (prose), 10 proposed experiments (canonical schema), competitor analysis, technical checks.
-
-A few quality bars that matter to us:
-
-- **Cite everything.** Every claim ties to a specific artifact — screenshot path or URL. No speculation.
-- **Diversify pillars.** Your 10 experiments should span Conversion / AOV / Retention / Acquisition / Performance — don't be all-Conversion.
-- **Generalize.** Your harness generalizes to other Shopify stores. We'll point it at storefronts it has never seen — don't bake gingerpeople-specific shortcuts in.
-
-How you architect the crawl, the reasoning, and the writing — single agent, subagents, custom skills, MCP tools, anything — is your call. The phases are the bar; the architecture is the test.
-
-## Provided in this repo
-
-- `target_report.md` — a production-quality Qosmic audit. Calibration anchor.
-- **Test URLs:**
-  - `gingerpeople.com` — calibration target. Your output should approach `target_report.md`'s bar.
-  - `zenrojas.com` — generalization target. We have an internal reference for this one; your harness has to produce a good audit for a store you haven't been calibrated against.
-
-## Part 1 (~2 hours): Runtime harness
-
-A coding agent plus your harness should be able to act as a Qosmic audit agent.
-
-Default recommendation: write skills (YAML frontmatter + progressive-disclosure bodies) for Claude Code or Codex, plus an entry-point context file (`CLAUDE.md` / `AGENTS.md`). The point of this default is fastest possible iteration on output quality, not a constraint. If you'd rather reach for LangChain / Playwright / paid APIs / a custom runtime — go for it. We're not testing infra plumbing; we're testing the audit agent your harness produces.
-
-Your harness must run end-to-end on both URLs. Ship outputs in `sample_output/` as either `.md` or `.html` — your call. Styling doesn't matter. The content, the reasoning that produced it, and whether your harness generalizes are what we read.
-
-## Part 2 (~2 hours): Eval system + autonomy plan ← weighted heavier
-
-Build the eval system. Shape, tools, methodology — your call. Generality required: your evals have to score audit reports for stores they've never seen, not just gingerpeople.
-
-In `EVAL_LOOP.md` (≤1 page), answer: **how does this eval system become autonomous and self-learning with minimal humans in the loop?** What does it look like 1–3 months out? How does it improve itself? Where do humans enter — and how do you keep that surface shrinking over time?
-
-This is the headline signal. A sharp self-improving eval loop on a thin runtime harness beats a beautiful runtime harness with static evals.
-
-## Deliverables
-
-- Runtime harness + eval system + `sample_output/`
-- `AGENT_LOG.md` — time per part, prompts you fed your agent, where the agent drove vs. where you took the wheel
-- `EVAL_LOOP.md` — how the eval system becomes autonomous + self-learning
-- `WORKFLOWS.md` (≤1 page) — how you actually use coding agents day-to-day. Tool stack, delegation patterns, custom skills / slash commands / MCP servers you've built, what you let agents drive vs. always take the wheel on. Not about this take-home — about how you work.
-- 3-5min Loom — walk through your harness and your eval loop; name one decision you'd reverse; name one dimension you didn't measure that you think matters
-
-**Submission:** either send over a zip containing your deliverables or create a GitHub repo, push your work, share the URL. Also include a Loom link with us by email (trustin@qosmic.ai). No fixed deadline — turn it around within a few days of starting.
+## Sample output (zenrojas.com — real run)
+- Audit report → [`sample_output/zenrojas.com.md`](sample_output/zenrojas.com.md)
+- Eval scorecard → [`sample_output/zenrojas.com.eval.json`](sample_output/zenrojas.com.eval.json)
+  (judge verdicts: [`…eval-verdicts.json`](sample_output/zenrojas.com.eval-verdicts.json))
 
 ---
 
-## A few things worth saying directly
+## 1. The problem & what got done
 
-- **AI-agent use is expected — that's the role.** Show us how you use them; the `AGENT_LOG.md` and `WORKFLOWS.md` files are how we read it.
-- **Audit output format is markdown or HTML — your call.** Styling is irrelevant. We're reading the content, the reasoning that produced it, and whether your harness generalizes.
-- **We've intentionally left a lot of decisions to you.** The "right" answer is whatever you'd do. We're more interested in your taste than in you guessing what we'd want.
-- **The eval loop is the headline.** Better runtime is upside on top, not a substitute.
+Build (a) a runtime harness that makes a coding agent act as the Qosmic audit agent
+for *any* Shopify store, and (b) an eval system around it. Done in a single
+**~4h 45m** session (under the 5h ceiling — see [AGENT_LOG.md](AGENT_LOG.md)).
 
-Happy to answer any questions — ping us at trustin@qosmic.ai.
+**On gingerpeople.com (the calibration target):** the store was **down for ~2 days**
+and is back up now — but its **Cloudflare is now blocking all automated browsers**. I
+tried multiple approaches (realistic UA, Playwright stealth + automation-flag patches,
+httpx→browser gate-escalation, a `--proxy` hook) and **could not get past their managed
+challenge**, so the harness can't produce a result for gingerpeople.com to compare
+against the provided `target_report.md`. The harness reports this honestly
+(`status: blocked:challenge`) rather than fabricating.
+
+**So I ran the full pipeline on zenrojas.com instead** — audit + eval, both attached
+above. The eval (real numbers): **overall 0.788**, grounding 0.80, specificity 0.90,
+structural 1.0, pillar-balance 0.875, **0 hallucinated citations, 0 gates** — and it
+flagged real **coverage gaps** (checkout/search/page surfaces captured but not engaged),
+which is exactly the actionable signal the self-improvement loop runs on.
+
+## 2. Approach (design, main points)
+
+- **Hybrid harness:** Claude Code **skills** drive reasoning/writing; **deterministic
+  Python** (`tools/`) does crawl, digest, tech-checks, assembly. Skill = the manual,
+  Python = the machine, agent = the operator.
+- **Crawl → evidence:** BFS discovery (no sitemap dependency), robots **polite-only**
+  (never a gate — Shopify disallows `/cart` etc.), a **health gate** (abort on
+  dead/blocked sites), **stealth + browser escalation** for Cloudflare, and
+  **interaction capture** (add-to-cart → cart drawer, popup) so we don't falsely call
+  a feature "missing." Every run → `evidence/<domain>_<ts>/` + a `manifest.json`
+  citation backbone.
+- **Reason:** a deterministic **digest** pre-extracts CRO signals + routes each surface
+  to pillars; **5 specialist playbooks** (Conversion/AOV/Retention/Acquisition/
+  Performance), each research-backed (Baymard, NN/g, web.dev…), generate experiments
+  as **structured JSON**; a coverage-floor + confidence selection picks the final 10.
+- **Write = assembly, not an LLM writer:** Python stitches the structured artifacts
+  into `report.md`. The LLM only generates *data* — executive summary + competitor
+  analysis (web-search-grounded, **honest "unavailable" if no web search**, never
+  fabricated). Tech checks are fully deterministic.
+- **Structured outputs everywhere** until the final deterministic assembly — prose is
+  rendered only at the last step, so the report structure can't drift.
+- **Evidence-honest:** tri-state signals (`present`/`absent`/`unverified`); the agent
+  may never claim a "missing X" from an unverified signal. Limitations tracked in
+  [wherewefail.md](wherewefail.md).
+
+## 3. Evaluation (separate harness)
+
+Scores a report for a store it's never seen, with **no golden answer** — so it's
+layered and mostly *not* an LLM:
+
+- **Deterministic (trustworthy floor):** structural (schema/sections/pillar-balance),
+  **citation existence** (catches hallucinated evidence), **coverage** (high-value
+  surfaces × plausibly-applicable pillars).
+- **Caged agent judge:** two narrow single-question verdicts — *does this screenshot
+  support this claim* (grounding) and *is this experiment generic slop* (specificity).
+- **Gates → vector → scalar:** hallucinated citation / missing pillar / ≠10 **cap** the
+  score (no laundering fabricated evidence). The real output is the **vector**; the
+  scalar exists only for **ranking**.
+- **Relative scoring** (`--compare`) is the improvement engine; **meta-validation**
+  (`--validate`) makes a real run out-score a sabotaged copy before you trust it.
+- Emits **machine-readable failures** that feed the self-improving loop. Autonomy plan:
+  `EVAL_LOOP.md`.
+
+## 4. Key files
+
+| File / dir | What it is |
+|---|---|
+| [CLAUDE.md](CLAUDE.md) / `AGENTS.md` | Entry point — the audit pipeline + quality bars |
+| [decision.md](decision.md) | Every decision + the reasoning behind it (D1–D25) |
+| [task.md](task.md) | Task tracker (with the change-trail) |
+| [wherewefail.md](wherewefail.md) | Honest known limitations, per phase |
+| [AGENT_LOG.md](AGENT_LOG.md) | Time per part, prompts fed, agent-drove-vs-took-the-wheel |
+| `EVAL_LOOP.md` | Eval autonomy + self-learning plan |
+| `tools/` | Deterministic Python: `crawl` `digest` `tech_checks` `assemble` `select` `eval` (+ `qcrawl/`) |
+| `.claude/skills/` | `crawl`, `reason` (+ `playbooks/`), `synthesize`, `eval` |
+| `eval/` | The eval harness (layers + scorer + comparator + meta-validation) |
+| `schema/` | Structured-output contracts (experiment/summary/competitors) |
+| `sample_output/` | The zenrojas.com audit + eval scorecard |
+
+## Run
+
+```powershell
+python tools/setup_env.py                 # one-time: pinned venv + Chromium
+
+# deterministic pass (one command)
+.\.venv\Scripts\python.exe tools/audit.py https://store.com
+
+# full audit (agent-driven) — say to a coding agent:
+#   audit https://store.com
+# evaluate a finished run — say:
+#   evaluate evidence/<run>
+
+.\.venv\Scripts\python.exe -m pytest      # all test suites
+```

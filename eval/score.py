@@ -46,6 +46,6 @@ def score(ev: dict) -> dict:
         "gates": gates,
         "score": min(0.3, raw) if gated else raw,   # gated reports can't out-rank clean ones
         "vector": vector,
-        "partial_no_llm": j.get("status") != "ok",
+        "partial_no_llm": j.get("status") not in ("ok", "agent"),  # 'agent' = judged via skill
         "weights": WEIGHTS,
     }

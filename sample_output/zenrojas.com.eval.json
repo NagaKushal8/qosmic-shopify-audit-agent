@@ -1,0 +1,162 @@
+{
+  "run": "zenrojas.com_20260614-211612",
+  "n_experiments": 10,
+  "structural": {
+    "fails": [],
+    "pillar_distribution": {
+      "Conversion": 2,
+      "AOV": 3,
+      "Retention": 2,
+      "Acquisition": 2,
+      "Performance": 1
+    },
+    "pillar_balance": 0.875,
+    "structural_integrity": 1.0
+  },
+  "citations": {
+    "fails": [],
+    "hallucinated": 0,
+    "citation_validity": 1.0
+  },
+  "coverage": {
+    "coverage": 0.5,
+    "categories_present": [
+      "blog",
+      "cart",
+      "checkout",
+      "collection",
+      "home",
+      "page",
+      "product",
+      "search"
+    ],
+    "categories_engaged": [
+      "blog",
+      "cart",
+      "collection",
+      "product"
+    ],
+    "flagged_gaps": [
+      {
+        "category": "checkout",
+        "plausible_pillars": [
+          "Conversion",
+          "Performance"
+        ],
+        "cited_pillars": []
+      },
+      {
+        "category": "home",
+        "plausible_pillars": [
+          "Acquisition",
+          "Conversion"
+        ],
+        "cited_pillars": [
+          "Retention"
+        ]
+      },
+      {
+        "category": "page",
+        "plausible_pillars": [
+          "Acquisition",
+          "Conversion"
+        ],
+        "cited_pillars": []
+      },
+      {
+        "category": "search",
+        "plausible_pillars": [
+          "Acquisition",
+          "Conversion"
+        ],
+        "cited_pillars": []
+      }
+    ]
+  },
+  "judge": {
+    "status": "agent",
+    "grounding_precision": 0.8,
+    "specificity": 0.9,
+    "verdicts": [
+      "supported",
+      "supported",
+      "supported",
+      "not_visible",
+      "supported",
+      "supported",
+      "supported",
+      "supported",
+      "not_visible",
+      "supported"
+    ],
+    "n_grounded": 10
+  },
+  "score": {
+    "status": "ok",
+    "gates": [],
+    "score": 0.788,
+    "vector": {
+      "grounding_precision": 0.8,
+      "specificity": 0.9,
+      "coverage": 0.5,
+      "structural_integrity": 1.0,
+      "pillar_balance": 0.875
+    },
+    "partial_no_llm": false,
+    "weights": {
+      "grounding_precision": 0.4,
+      "specificity": 0.2,
+      "coverage": 0.2,
+      "structural_integrity": 0.1,
+      "pillar_balance": 0.1
+    }
+  },
+  "failures": [
+    {
+      "type": "coverage_gap",
+      "detail": {
+        "category": "checkout",
+        "plausible_pillars": [
+          "Conversion",
+          "Performance"
+        ],
+        "cited_pillars": []
+      }
+    },
+    {
+      "type": "coverage_gap",
+      "detail": {
+        "category": "home",
+        "plausible_pillars": [
+          "Acquisition",
+          "Conversion"
+        ],
+        "cited_pillars": [
+          "Retention"
+        ]
+      }
+    },
+    {
+      "type": "coverage_gap",
+      "detail": {
+        "category": "page",
+        "plausible_pillars": [
+          "Acquisition",
+          "Conversion"
+        ],
+        "cited_pillars": []
+      }
+    },
+    {
+      "type": "coverage_gap",
+      "detail": {
+        "category": "search",
+        "plausible_pillars": [
+          "Acquisition",
+          "Conversion"
+        ],
+        "cited_pillars": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "verdicts": [
+    {"exp_id": "exp-e51fabeb9170", "verdict": "supported"},
+    {"exp_id": "exp-5b08fece8b21", "verdict": "supported"},
+    {"exp_id": "exp-2bd5da7bcfcd", "verdict": "supported"},
+    {"exp_id": "exp-9f059a321fb6", "verdict": "not_visible"},
+    {"exp_id": "exp-f34920d975e8", "verdict": "supported"},
+    {"exp_id": "exp-1da4d8ba2666", "verdict": "supported"},
+    {"exp_id": "exp-d91af5c585eb", "verdict": "supported"},
+    {"exp_id": "exp-bd19ef3f5e53", "verdict": "supported"},
+    {"exp_id": "exp-a420718b92ea", "verdict": "not_visible"},
+    {"exp_id": "exp-0bfcc1a98b00", "verdict": "supported"}
+  ],
+  "generic": [
+    {"exp_id": "exp-e51fabeb9170", "generic": false},
+    {"exp_id": "exp-5b08fece8b21", "generic": false},
+    {"exp_id": "exp-2bd5da7bcfcd", "generic": false},
+    {"exp_id": "exp-9f059a321fb6", "generic": true},
+    {"exp_id": "exp-f34920d975e8", "generic": false},
+    {"exp_id": "exp-1da4d8ba2666", "generic": false},
+    {"exp_id": "exp-d91af5c585eb", "generic": false},
+    {"exp_id": "exp-bd19ef3f5e53", "generic": false},
+    {"exp_id": "exp-a420718b92ea", "generic": false},
+    {"exp_id": "exp-0bfcc1a98b00", "generic": false}
+  ]
+}
