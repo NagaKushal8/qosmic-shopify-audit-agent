@@ -9,8 +9,10 @@ Two independent commands, never chained:
 - `evaluate evidence/<run>` → scores a finished report.
 
 ## Recordings
-- 🎥 **Audit walkthrough (zenrojas.com):** _<add screen-recording link>_
-- 🎥 **Eval walkthrough (zenrojas.com):** _<add screen-recording link>_
+- **Audit walkthrough (zenrojas.com):** <img width="1727" height="530" alt="image" src="https://github.com/user-attachments/assets/56e75d9c-2086-467c-8690-1cda153a54d6" />
+_
+- **Eval walkthrough (zenrojas.com):** <img width="1546" height="462" alt="Screenshot 2026-06-14 222916" src="https://github.com/user-attachments/assets/effe16e9-25b4-4bcc-a5e8-8bd1186a10c1" />
+_
 
 ## Sample output (zenrojas.com — real run)
 - Audit report → [`sample_output/zenrojas.com.md`](sample_output/zenrojas.com.md)
