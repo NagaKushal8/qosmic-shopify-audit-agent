@@ -13,7 +13,7 @@
 
 ### Coverage / sampling
 - 🟡 **Large catalogs (e.g. 800 products).** We **sample**, we don't audit
-  everything: caps are `--max-fetch 40` (discovery) and `--max-capture 15`
+  everything: caps are `--max-fetch 60` (discovery) and `--max-capture 30`
   (capture), with per-category limits (≈3 products). → *Long-tail / per-SKU issues
   on un-sampled products are missed.* This is by design (representative coverage),
   but it means "no issue found" ≠ "no issue exists" across the full catalog.
@@ -24,10 +24,15 @@
 - 🟡 **Password-protected store.** Detected up front; we capture the homepage as
   proof and exit with `status=blocked:password`. → *We cannot audit anything behind
   the gate — the report will be near-empty by necessity.*
-- 🟡 **Cloudflare / bot protection.** Detected and recorded. A real browser may
-  pass mild challenges, but an aggressive WAF can block even Playwright. → *Audit
-  may degrade to homepage-only; httpx discovery under-performs under CF (mitigated
-  by browser-fallback discovery, not eliminated).*
+- 🟡 **Cloudflare / bot protection (mitigated, D22).** We now use a realistic UA
+  (no bot tag), lightweight Playwright stealth (automation flags patched), and
+  **browser gate-escalation**: when the httpx pre-flight is challenged we re-probe
+  with the stealth browser and, if it passes, run a full browser-based crawl. A
+  `--proxy` flag helps with IP-level blocks. STILL: an aggressive WAF (managed
+  challenge / advanced fingerprinting) can beat lightweight stealth — then we report
+  `blocked:challenge` honestly (homepage proof), never fabricate. Heavier escalations
+  (residential proxy rotation, persistent real-profile, cookie injection) are
+  possible but not built.
 - 🔴 **IP / rate-based blocking on repeated runs.** No proxy rotation; running many
   audits from one IP may get throttled or blocked.
 - 🟢 **Dead / down / all-404 site (D11).** Two-tier health gate: pre-flight homepage
@@ -40,9 +45,14 @@
 - 🟡 **Slow / never-completing JS hydration.** We wait for a bounded `networkidle`
   settle, then snapshot. → *Very slow or infinite-spinner pages may be captured
   pre-hydration (skeleton state).*
-- 🔴 **Interaction-gated content.** We capture static loaded states only — no
-  clicking. Mega-menus, "load more", accordions, quick-view modals, cart drawers,
-  and content behind tabs are **not** expanded/captured.
+- 🟡 **Interaction-gated content (partially mitigated, D21).** We now drive a few
+  best-effort recipes: **add-to-cart → cart drawer** (cross-sell / free-shipping bar)
+  and **email popup** capture. Signals from these are **tri-state** (`present` /
+  `absent` / `unverified`), and the reasoner is barred from claiming a feature is
+  "missing" from an `unverified` signal — so a static snapshot can no longer produce a
+  confidently-wrong "you're missing X". STILL uncaptured: mega-menus, "load more",
+  accordions, quick-view modals, tabbed content; and recipes are theme-brittle (when a
+  selector misses, the signal stays `unverified`, never falsely `absent`).
 - 🟡 **Cookie/consent & promo overlays.** May obscure screenshots; we don't
   auto-dismiss them.
 
@@ -67,18 +77,45 @@
 
 ---
 
-## Phase 2 — Reason *(not built yet — anticipated)*
-- 🔴 **Hallucinated findings.** Reasoning could assert issues not grounded in
-  captured evidence. *Planned mitigation: every claim must cite a manifest path;
-  eval enforces it.*
-- 🟡 **Evidence ceiling.** Reasoning is only as good as what Crawl captured — gaps
-  above propagate (can't flag a leak on a page we never saw).
-- 🟡 **Pillar balance.** Forcing 2 experiments/pillar may produce weak ones for a
-  store whose real problems cluster in one pillar.
+## Phase 2 — Reason (digest + 5-agent generation; built)
+- 🟡 **Digest signals are heuristics, not truth.** `price_present` /
+  `add_to_cart_present` / `reviews` etc. use generic DOM + regex rules. They can
+  **false-positive** (e.g. "$5 shipping" reads as a price) or **false-negative**
+  (unusual theme markup). Mitigation: they're *hints* — the pillar agent confirms
+  against the screenshot and pulls HTML on demand. Still, a wrong signal can mislead.
+- 🟡 **Routing is approximate.** The preset surface→pillar map is fixed; a page's
+  real best pillar may differ. Mitigation: Pass-2 self-correction lets agents pull
+  cross-relevant pages — but a badly misrouted page could still be under-weighted.
+- 🟡 **Reduce/dedup is agent-judged.** Count/pillar-coverage + the selection
+  algorithm are deterministic (`experiments.py`), but semantic dedupe ("are these two
+  the same experiment?") relies on agent judgment → run-to-run variance.
+- 🟡 **Confidence isn't calibrated across pillars (D15).** Selection's fill step sorts
+  candidates from different pillar agents by `confidence`, but an 80% from the
+  Conversion agent ≠ 80% from the Performance agent. The fill order is therefore
+  noisy. *Planned: the eval/judge phase normalizes confidence across agents.*
+- 🟡 **Forced pillar balance.** Targeting ≈2/pillar can yield a weak experiment for a
+  pillar where the store has few real problems (we allow a justified skew, but the
+  "all 5 present" rule can still stretch a thin pillar).
+- 🟡 **Evidence ceiling.** Reasoning is only as good as what Crawl captured — every
+  Crawl limitation above propagates (can't flag a leak on a page we never saw).
+- 🔴 **Residual hallucination risk.** Citation is *required* by the skill and
+  evidence paths are validated to be paths/URLs, but we don't yet verify the cited
+  artifact actually supports the specific claim. *Planned: the eval system closes this.*
 
-## Phase 3 — Write *(not built yet — anticipated)*
-- 🟡 **Schema/format drift** vs `target_report.md` (exp-id uniqueness, required
-  fields). *Planned mitigation: deterministic eval checks.*
+## Phase 3 — Write = deterministic assembly (built)
+- 🟢 **Format drift** vs `target_report.md` — eliminated: `assemble.py` renders the
+  fixed structure deterministically from structured JSON; no LLM in assembly.
+- 🟡 **Competitor analysis requires a web-search tool.** If none is available, the
+  section is honestly marked `unavailable` (not fabricated). So a run without web
+  search ships **no competitor table** — by design (D19). Honest, but a gap.
+- 🟡 **Competitor grounding is search-snippet-deep, not crawl-deep.** We don't crawl
+  competitors; positioning/"what they make easier" rests on search results + model
+  reasoning. Domain-verify only confirms the domain resolves, not the claims.
+- 🟡 **Tech-check page speed is a proxy.** "Page Speed" uses navigation timing
+  (`load_ms`), not a real Lighthouse run — flagged in the detail text. Image
+  optimization counts images but doesn't measure bytes.
+- 🟡 **Executive summary can be `unavailable`** if the LLM can't synthesize a valid
+  structured summary — rendered as an honest note rather than faked.
 
 ## Phase 4 — Eval *(not built yet — anticipated)*
 - 🟡 **LLM-judge variance / generality** across unseen stores; rubric calibration
@@ -86,4 +123,4 @@
 
 ---
 
-_Last updated: 2026-06-14 (Phase 1 resilience pass + D11 dead-site health gate)._
+_Last updated: 2026-06-14 (D22 stealth + browser gate-escalation — Cloudflare/WAF fallback)._

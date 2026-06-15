@@ -8,4 +8,5 @@ Modules:
   manifest   — assemble + write manifest.json, the citation backbone (later)
 """
 
-__all__ = ["robots", "discovery", "capture", "manifest", "health"]
+__all__ = ["robots", "discovery", "capture", "manifest", "health",
+           "pillars", "digest", "experiments", "tech_checks", "synth", "assemble"]

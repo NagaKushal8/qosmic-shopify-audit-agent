@@ -23,9 +23,10 @@ from bs4 import BeautifulSoup
 FUNCTIONAL_SEEDS = ["/", "/cart", "/checkout", "/search", "/collections/all", "/account/login"]
 
 # Per-category sampling caps for the capture phase (backstop against huge stores).
+# Sum (~35) sits just above --max-capture (30) so the global cap is the real limit.
 DEFAULT_CAPS = {
     "home": 1, "cart": 1, "checkout": 1, "search": 1, "account": 1,
-    "collection": 2, "product": 3, "page": 5, "blog": 2, "policy": 2, "other": 3,
+    "collection": 4, "product": 8, "page": 8, "blog": 4, "policy": 2, "other": 4,
 }
 
 # Priority for sampling order (lower = captured first).
@@ -178,6 +179,25 @@ def bfs_discover(
         if crawl_delay:
             time.sleep(crawl_delay)
 
+    return list(surfaces.values())
+
+
+def seed_surfaces(start_url: str, extra_links: Iterable[str] = ()) -> list[Surface]:
+    """Build a surface list from homepage + functional seeds + browser-discovered
+    links (same-host, deduped). Used when httpx discovery is unavailable (e.g. a
+    Cloudflare-gated store we reach only via the stealth browser — D22)."""
+    root = root_url(start_url)
+    root_host = urlparse(root).netloc
+    surfaces: dict[str, Surface] = {}
+
+    for seed in FUNCTIONAL_SEEDS:
+        url, _ = urldefrag(urljoin(root + "/", seed.lstrip("/")))
+        surfaces.setdefault(url, Surface(url=url, category=categorize(url), depth=0))
+    for link in extra_links:
+        if same_host(link, root_host):
+            url, _ = urldefrag(link)
+            surfaces.setdefault(url, Surface(url=url, category=categorize(url),
+                                             depth=1, discovered_from="browser"))
     return list(surfaces.values())
 
 

@@ -46,8 +46,74 @@
 - [ ] T1.14 — Run crawl on `gingerpeople.com`, inspect manifest + artifacts
 - [ ] T1.15 — Run crawl on `zenrojas.com`, confirm it generalizes
 
-## Phase 2 — Reason (later)
-- [ ] T2.x — reasoning skill: find revenue leaks across 5 pillars, build 10 experiments
+## Phase 2 — Reason (generation) — BUILT (user to run)
+### 2a. Deterministic foundation (`tools/`)
+- [x] T2.1 — `qcrawl/pillars.py` — preset Shopify surface→pillar map (D12)
+- [x] T2.2 — `qcrawl/digest.py` — CRO-signal extraction per category (price/add-to-cart/reviews/variant/qty/cta/email/empty-cart/tiles/filters/perf), generic + defensive
+- [x] T2.3 — `qcrawl/digest.py` builder + `tools/digest.py` CLI — read run folder → write `digest/digest.json` + per-pillar `<pillar>.md` + `summary.md` (NON-destructive, D14)
+- [x] T2.4 — `qcrawl/experiments.py` — schema validator + `make_exp_id` + report-set checks (count=10, 5 pillars, unique ids, evidence-path)
+- [x] T2.5 — tests: `test_digest.py` + `test_experiments.py` (**user runs**)
+
+### 2b. Agent layer (skills + entry point)
+- [x] T2.6 — `.claude/skills/crawl/SKILL.md` — setup_env + crawl.py + digest.py + health-gate handling
+- [x] T2.7 — `.claude/skills/reason/SKILL.md` — 5 pillar passes + two-pass self-correction + reduce + schema
+- [x] T2.8 — `CLAUDE.md` + `AGENTS.md` entry point — pipeline order + quality bars + skill pointers
+- [x] T2.9 — `wherewefail.md` updated with Reason-phase limitations
+
+### 2c. Selection + structured outputs (D15)
+- [x] T2.11 — `experiments.select_experiments` — coverage-floor + confidence-greedy fill (open-ended, ceiling 4)
+- [x] T2.12 — `schema/experiment.schema.json` — structured-output contract for pillar agents
+- [x] T2.13 — reason skill updated: open-ended generation, JSON structured output, deterministic selection+validation
+- [x] T2.14 — tests for selection (`test_experiments.py`) — user runs
+
+### 2d. Pillar specialization (D16) — DONE
+- [x] T2.15 — `reason/SKILL.md` refactored: each pass loads its playbook (specialist, not loop)
+- [x] T2.16 — created all 5 `reason/playbooks/*.md` — rich per-pillar prompts
+
+### 2e. De-overfit + research-back the playbooks (D20) — DONE
+- [x] T2.17 — web research (5 parallel agents): CRO best practices/benchmarks per pillar (Baymard, NN/g, web.dev, McKinsey, Klaviyo, Recharge, Ahrefs, Shopify…)
+- [x] T2.18 — rewrote all 5 playbooks: generic + framework-driven, removed store-specific overfit, added labeled benchmarks (authoritative vs rule-of-thumb) + sources + "how to think"
+- [x] T2.19 — strengthened `reason/SKILL.md` with a reasoning-discipline section (evidence-first, no overfit, benchmark-anchored confidence, honest absence)
+
+## Phase 3 — Write = deterministic assembly (D17/D18/D19) — BUILT (user to run)
+- [x] T3.1 — `qcrawl/tech_checks.py` + `tools/tech_checks.py` — deterministic ~15 checks from evidence + live probes (sitemap, http→https) → `report/tech_checks.json` (builds deferred T1.5)
+- [x] T3.2 — `schema/summary.schema.json` + `schema/competitors.schema.json` (structured-output contracts, D18; both carry `status` for honest-unavailable)
+- [x] T3.3 — `.claude/skills/synthesize/SKILL.md` — LLM: summary → `summary.json`, competitors → `competitors.json` (web-search only, domain-verified, no fabrication — D19)
+- [x] T3.4 — `qcrawl/synth.py` — domain-verify guard + structured validators (summary/competitors)
+- [x] T3.5 — `qcrawl/assemble.py` + `tools/assemble.py` — stitch report/*.json → `report.md` (target_report.md structure, honest on missing sections)
+- [x] T3.6 — tests: `test_tech_checks.py` + `test_assemble.py` + `test_synth.py` (**user runs**)
+- [x] T3.7 — pipeline wired in `CLAUDE.md`/`AGENTS.md` (crawl→digest→reason→synthesize→tech_checks→assemble); reason caches to `report/experiments.json`
+- [x] T3.8 — `wherewefail.md` updated (Write/competitor/tech-check limits + honest-unavailable behavior)
+
+### 2f. Loophole-1 fix — interaction capture + tri-state honesty (D21) — DONE
+- [x] T2.20 — `capture.py`: add-to-cart → cart-drawer capture (B1) + email-popup capture & dismiss (B4); new PageEvidence fields + `interactions` dict
+- [x] T2.21 — `digest.py`: tri-state signals (`cart_cross_sell`/`cart_free_shipping_bar` from drawer, `email_popup`, verified cross-sell/free-ship on cart page); drawer/popup paths in digest + pillar index
+- [x] T2.22 — `reason/SKILL.md`: "unverified ≠ absent" rule — never claim a missing feature from an unobserved signal
+- [x] T2.23 — tests for detectors + tri-state in `test_digest.py` (**user runs**)
+
+- [x] T3.9 — `tools/audit.py` one-shot deterministic runner (crawl→digest→tech_checks→assemble in one command)
+
+### 2g. Cloudflare/WAF fallback — stealth + gate-escalation (D22) — DONE
+- [x] T2.24 — realistic UA (dropped bot tag) for httpx + Playwright
+- [x] T2.25 — lightweight Playwright stealth (launch args + init-script patches + locale/timezone) in `_launch` + `render_homepage_links`
+- [x] T2.26 — browser gate-escalation in `crawl.py`: httpx challenged → stealth browser re-probe → full browser-based discovery (`seed_surfaces`) if it passes, else honest blocked/dead
+- [x] T2.27 — `--proxy` + `--no-stealth` flags threaded through capture
+- [x] T2.28 — `qcrawl/discovery.seed_surfaces` helper for browser-based discovery
+
+### 2h. Ergonomics fix from zenrojas.com run (D23) — DONE
+- [x] T2.29 — `tools/select.py` + `tools/synth_check.py` CLIs; reason/synthesize skills call them instead of inline `python -c` (fixes PowerShell quoting + qcrawl import-path errors)
+- [x] T2.30 — playbook filenames documented as lowercase (case-sensitive OS portability)
+
+### Validated by a real run
+- [x] zenrojas.com end-to-end: 30 surfaces, 13 candidates → 10 valid experiments (all 5 pillars), web-search competitors (4 domains verified), summary — all validated clean. Errors seen were inline-Python ergonomics (now fixed), not pipeline logic.
+
+### Pending
+- [ ] sample_output/ — copy the zenrojas + a gingerpeople report.md once finalized
+- [ ] Phase 4 (Eval — headline) still to come
+
+### Pending
+- [ ] T2.10 — user runs crawl+digest+pytest; feedback → iterate
+- [ ] Phase 4 (Eval — headline) still to come
 
 ## Phase 3 — Write (later)
 - [ ] T3.x — write-report skill: emit canonical report + competitor + tech checks

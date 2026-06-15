@@ -37,14 +37,25 @@ from .discovery import Surface, extract_links
 
 DESKTOP_VIEWPORT = {"width": 1366, "height": 900}
 MOBILE_VIEWPORT = {"width": 390, "height": 844}
+# Realistic UAs (no "bot" tag) — a declared bot is blocked instantly by WAFs.
 UA_DESKTOP = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/130.0.0.0 Safari/537.36 QosmicAuditBot/1.0 (+storefront-audit)"
+    "Chrome/130.0.0.0 Safari/537.36"
 )
 UA_MOBILE = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 "
-    "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1 QosmicAuditBot/1.0"
+    "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 )
+
+# Lightweight stealth (decision D22) — defeats bot checks that key on automation
+# flags / missing JS. Honest fallback: if a hard WAF still blocks, we report it.
+_STEALTH_ARGS = ["--disable-blink-features=AutomationControlled", "--disable-dev-shm-usage"]
+_STEALTH_INIT = """
+Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+window.chrome = { runtime: {} };
+Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+"""
 
 _PASSWORD_SIGNS = ("enter store password", "template-password", "store is password protected")
 _CHALLENGE_SIGNS = ("just a moment", "attention required", "checking your browser", "cf-browser-verification")
@@ -72,6 +83,11 @@ class PageEvidence:
     screenshot_path: Optional[str] = None
     screenshot_mobile_path: Optional[str] = None
     meta_path: Optional[str] = None
+    # interaction captures (Fix B — see decision D21)
+    drawer_screenshot_path: Optional[str] = None
+    drawer_html_path: Optional[str] = None
+    popup_screenshot_path: Optional[str] = None
+    interactions: dict = field(default_factory=dict)  # {'popup':..., 'add_to_cart':...}
 
 
 def slugify(url: str) -> str:
@@ -172,16 +188,101 @@ def _rel(path: Path, run_dir: Path) -> str:
     return path.relative_to(run_dir).as_posix()
 
 
-def _launch(pw, headless: bool):
+# --- interaction recipes (Fix B / D21) — generic + best-effort; failure => 'unverified' ---
+_ATC_SELECTORS = [
+    'form[action*="/cart/add"] button[type="submit"]',
+    'form[action*="/cart/add"] [type="submit"]',
+    'button[name="add"]', '[name="add"]',
+    'button[data-add-to-cart]', '[data-add-to-cart]',
+    'button:has-text("Add to cart")', 'button:has-text("Add to Cart")',
+    'button:has-text("Add to bag")',
+]
+_POPUP_SELECTOR = ('[role="dialog"], [class*="modal" i], [class*="popup" i], '
+                   '[id*="popup" i], [class*="newsletter" i]')
+_CLOSE_SELECTORS = ['[aria-label*="close" i]', '[class*="close" i]',
+                    'button:has-text("No thanks")', 'button:has-text("Close")']
+
+
+def _handle_popup(page, pdir: Path, run_dir: Path, ev: "PageEvidence") -> None:
+    """Screenshot a visible popup/modal (e.g. email capture), then dismiss it so the
+    main screenshot is clean. Records tri-state interaction status."""
+    try:
+        el = page.query_selector(_POPUP_SELECTOR)
+        if el and el.is_visible():
+            shot = pdir / "popup.png"
+            try:
+                el.screenshot(path=str(shot))
+            except (PWError, OSError):
+                page.screenshot(path=str(shot))
+            ev.popup_screenshot_path = _rel(shot, run_dir)
+            ev.interactions["popup"] = "shown"
+            try:
+                page.keyboard.press("Escape")
+            except PWError:
+                pass
+            for sel in _CLOSE_SELECTORS:
+                btn = page.query_selector(sel)
+                if btn and btn.is_visible():
+                    try:
+                        btn.click(timeout=1000)
+                    except PWError:
+                        pass
+                    break
+        else:
+            ev.interactions["popup"] = "none"
+    except PWError:
+        ev.interactions["popup"] = "error"
+
+
+def _interact_add_to_cart(page, pdir: Path, run_dir: Path, ev: "PageEvidence") -> None:
+    """Click add-to-cart on a PDP and capture the resulting cart drawer/page — the
+    surface where cross-sell / free-shipping bars actually live. Harmless (no order
+    is placed). Records tri-state status so the reasoner can tell verified-absent
+    from never-observed."""
+    try:
+        clicked = False
+        for sel in _ATC_SELECTORS:
+            el = page.query_selector(sel)
+            if el and el.is_visible():
+                try:
+                    el.click(timeout=2000)
+                    clicked = True
+                    break
+                except PWError:
+                    continue
+        if not clicked:
+            ev.interactions["add_to_cart"] = "no_button"
+            return
+        page.wait_for_timeout(1800)  # let the drawer animate / cart navigate
+        shot = pdir / "drawer.png"
+        page.screenshot(path=str(shot), full_page=True)
+        ev.drawer_screenshot_path = _rel(shot, run_dir)
+        html_file = pdir / "drawer.html"
+        html_file.write_text(page.content(), encoding="utf-8")
+        ev.drawer_html_path = _rel(html_file, run_dir)
+        ev.interactions["add_to_cart"] = "ok"
+    except (PWError, OSError):
+        ev.interactions["add_to_cart"] = "error"
+
+
+def _launch(pw, headless: bool, *, proxy: Optional[str] = None, stealth: bool = True):
     """Launch browser + desktop/mobile contexts. Raises on failure (caller handles)."""
-    browser = pw.chromium.launch(headless=headless)
-    desktop = browser.new_context(
-        viewport=DESKTOP_VIEWPORT, user_agent=UA_DESKTOP, ignore_https_errors=True
-    )
+    launch_kwargs: dict = {"headless": headless}
+    if stealth:
+        launch_kwargs["args"] = _STEALTH_ARGS
+    if proxy:
+        launch_kwargs["proxy"] = {"server": proxy}
+    browser = pw.chromium.launch(**launch_kwargs)
+
+    common = dict(ignore_https_errors=True, locale="en-US", timezone_id="America/New_York")
+    desktop = browser.new_context(viewport=DESKTOP_VIEWPORT, user_agent=UA_DESKTOP, **common)
     mobile = browser.new_context(
         viewport=MOBILE_VIEWPORT, user_agent=UA_MOBILE, is_mobile=True,
-        has_touch=True, device_scale_factor=2, ignore_https_errors=True,
+        has_touch=True, device_scale_factor=2, **common,
     )
+    if stealth:
+        desktop.add_init_script(_STEALTH_INIT)
+        mobile.add_init_script(_STEALTH_INIT)
     return browser, desktop, mobile
 
 
@@ -204,6 +305,9 @@ def _capture_one(desktop_ctx, mobile_ctx, surface: Surface, order: int, run_dir:
         ev.final_url = page.url
     if err:
         ev.error = err
+
+    # Popup BEFORE the clean screenshot (captures it, then dismisses it) — Fix B4
+    _handle_popup(page, pdir, run_dir, ev)
 
     try:
         html = page.content()
@@ -237,6 +341,11 @@ def _capture_one(desktop_ctx, mobile_ctx, surface: Surface, order: int, run_dir:
         ev.screenshot_path = _rel(shot, run_dir)
     except (PWError, OSError):
         pass
+
+    # Add-to-cart -> cart drawer, PDPs only (after the clean screenshot) — Fix B1
+    if surface.category == "product":
+        _interact_add_to_cart(page, pdir, run_dir, ev)
+
     _safe_close(page)
 
     # --- mobile: screenshot only (isolated; failure never affects desktop) ---
@@ -255,7 +364,8 @@ def _capture_one(desktop_ctx, mobile_ctx, surface: Surface, order: int, run_dir:
 
 def capture_surfaces(surfaces: list[Surface], run_dir: Path, *, timeout: int = 30,
                      crawl_delay: float = 0.0, headless: bool = True,
-                     settle_ms: int = 1500) -> list[PageEvidence]:
+                     settle_ms: int = 1500, proxy: Optional[str] = None,
+                     stealth: bool = True) -> list[PageEvidence]:
     """Capture all surfaces. Always returns one PageEvidence per surface (in order),
     even if the browser fails to launch or crashes mid-run."""
     run_dir = Path(run_dir)
@@ -266,7 +376,7 @@ def capture_surfaces(surfaces: list[Surface], run_dir: Path, *, timeout: int = 3
 
     with sync_playwright() as pw:
         try:
-            browser, desktop_ctx, mobile_ctx = _launch(pw, headless)
+            browser, desktop_ctx, mobile_ctx = _launch(pw, headless, proxy=proxy, stealth=stealth)
         except (PWError, Exception) as exc:  # browser won't even start
             reason = f"browser_launch:{type(exc).__name__}"
             return [PageEvidence(order=i, url=s.url, category=s.category, error=reason)
@@ -281,7 +391,7 @@ def capture_surfaces(surfaces: list[Surface], run_dir: Path, *, timeout: int = 3
                     # likely a browser/context crash — relaunch once and retry this page
                     _safe_close(browser)
                     try:
-                        browser, desktop_ctx, mobile_ctx = _launch(pw, headless)
+                        browser, desktop_ctx, mobile_ctx = _launch(pw, headless, proxy=proxy, stealth=stealth)
                         ev = _capture_one(desktop_ctx, mobile_ctx, surface, order, run_dir,
                                           pages_dir, timeout_ms, settle_ms)
                     except (PWError, Exception) as exc2:
@@ -297,22 +407,23 @@ def capture_surfaces(surfaces: list[Surface], run_dir: Path, *, timeout: int = 3
 
 
 def render_homepage_links(url: str, *, timeout: int = 30, headless: bool = True,
-                          settle_ms: int = 2500) -> tuple[str, set[str], Optional[int]]:
-    """Browser-fallback discovery (D9 fix #4): render the homepage and extract links.
+                          settle_ms: int = 2500, proxy: Optional[str] = None,
+                          stealth: bool = True) -> tuple[str, set[str], Optional[int]]:
+    """Browser-fallback discovery + stealth gate-escalation (D9 #4 / D22).
 
-    Used when httpx BFS comes back near-empty (JS-rendered storefront or a
-    Cloudflare-challenged httpx request). Returns (html, links, status).
+    Renders the homepage with a real (stealth) browser and extracts links. Used when
+    httpx BFS comes back near-empty (JS-rendered storefront) OR when the httpx
+    pre-flight gate was challenged (Cloudflare) and we re-probe with the browser.
+    Returns (html, links, status).
     """
     html, links, status = "", set(), None
     with sync_playwright() as pw:
         try:
-            browser = pw.chromium.launch(headless=headless)
+            browser, desktop_ctx, _mobile = _launch(pw, headless, proxy=proxy, stealth=stealth)
         except (PWError, Exception):
             return html, links, status
         try:
-            ctx = browser.new_context(viewport=DESKTOP_VIEWPORT, user_agent=UA_DESKTOP,
-                                      ignore_https_errors=True)
-            page = ctx.new_page()
+            page = desktop_ctx.new_page()
             resp, _ = _navigate(page, url, timeout * 1000, settle_ms)
             if resp is not None:
                 status = resp.status

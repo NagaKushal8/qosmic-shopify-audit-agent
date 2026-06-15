@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QosmicExecutiveSummary",
+  "description": "Executive summary as structured data (D18). LLM-synthesized from the selected experiments. Rendered to prose by assemble.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "unavailable"],
+      "description": "'ok' if generated; 'unavailable' if the config (LLM) could not produce it — be honest, do NOT fabricate."
+    },
+    "note": {
+      "type": "string",
+      "description": "When status=unavailable, the honest reason shown in the report."
+    },
+    "thesis_title": {
+      "type": "string",
+      "description": "Punchy one-line thesis (the report H1), e.g. 'the store is back; the buy path is now the constraint'."
+    },
+    "paragraphs": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim", "body"],
+        "properties": {
+          "claim": { "type": "string", "description": "Bolded lead sentence." },
+          "body": { "type": "string", "description": "Supporting prose; references surfaces/evidence already cited by experiments." }
+        }
+      }
+    }
+  }
+}

@@ -66,6 +66,79 @@ Chronological list of the actual prompts/instructions given.
      wired into `crawl.py` with early-exit + always-manifest; `test_health.py`
      added (offline). Flipped the dead-site item in `wherewefail.md` to handled.
 
+7. *(build generation phase)* "Approved: pre-extract signals + HTML on demand, 5
+   pillar agents → 10 experiments, preset routing, two-pass self-correction. Build it
+   all carefully, record decisions, track tasks, note limits in wherewefail. I'll
+   review after you finish."
+   - Outcome (agent drove, no execution): D12/D13/D14 recorded. Built
+     `qcrawl/pillars.py` (preset map), `qcrawl/digest.py` + `tools/digest.py`
+     (deterministic CRO-signal extraction + non-destructive digest), `qcrawl/
+     experiments.py` (schema validator + exp-id + budget guardrails),
+     `test_digest.py` + `test_experiments.py`. Wrote the agent layer:
+     `.claude/skills/crawl/SKILL.md`, `.claude/skills/reason/SKILL.md`, and the
+     `CLAUDE.md`/`AGENTS.md` entry point. Updated `wherewefail.md` (Reason limits).
+
+8. *(selection + structured outputs)* "Make generation open-ended (ceiling 3–4) and
+   select: top-2/pillar then fill by confidence; enforce structured confidence output
+   for sorting. Also — there are no structured outputs anywhere; explain + add."
+   - Outcome: added `select_experiments` (coverage-floor + confidence-greedy, D15),
+     `schema/experiment.schema.json` (structured-output contract), updated reason
+     skill to demand JSON output + deterministic select/validate, added selection
+     tests. Logged the cross-pillar confidence-calibration caveat in wherewefail.
+
+9. *(playbooks)* "Do the playbooks (Option B): shared reason skill + 5 rich
+   pillar playbooks. Leave summary/competitor/assembly for later direction."
+   - Outcome: refactored `reason/SKILL.md` to load a per-pillar playbook each pass
+     (specialist, not loop); created `reason/playbooks/{conversion,aov,retention,
+     acquisition,performance}.md` — each with mission, leak patterns, weighted
+     digest signals, KPIs, hypothesis + decision-rule templates, example angles.
+
+10. *(write phase)* "Competitor = web search only, no fabrication; if unavailable be
+    honest in summary + competitors + wherewefail. Cache the 3 structured outputs;
+    stitch with Python flawlessly to target_report.md shape; write a skill. Finish it."
+    - Outcome (agent drove, no execution): D19 recorded. Built `synthesize` skill
+      (LLM summary + web-search competitors, honest-unavailable), `schema/{summary,
+      competitors}.schema.json`, `qcrawl/synth.py` (domain-verify + validators),
+      `qcrawl/tech_checks.py` + `tools/tech_checks.py` (deterministic ~15 checks),
+      `qcrawl/assemble.py` + `tools/assemble.py` (Python stitch → report.md).
+      Tests: test_tech_checks / test_assemble / test_synth. Wired pipeline in
+      CLAUDE.md/AGENTS.md; updated wherewefail (honest-unavailable + proxies).
+
+11. *(de-overfit playbooks)* "Playbooks are overfit (tailored to the calibration
+    store). Go on the internet, build a knowledge base, rewrite the playbooks
+    generic + very rich in context + open-ended, and better the reason skill."
+    - Outcome: spawned 5 parallel web-research subagents (one per pillar) → cited CRO
+      knowledge (Baymard, NN/g, web.dev, McKinsey, Klaviyo, Recharge, Ahrefs,
+      Shopify). Rewrote all 5 playbooks to be generic/framework-driven with labeled
+      benchmarks + sources + "how to think"; removed all calibration-store
+      references. Strengthened reason skill with a reasoning-discipline section
+      (evidence-first, anti-overfit, benchmark-anchored confidence). D20 recorded.
+
+12. *(loophole-1 fix)* "Fix the confidently-wrong-absences loophole — do it."
+    - Outcome (no execution): D21. Added interaction capture to `capture.py`
+      (add-to-cart → cart drawer B1; email popup capture+dismiss B4) and tri-state
+      signals to `digest.py` (`present`/`absent`/`unverified`); reason skill now bars
+      "missing X" claims from `unverified` signals. Tests added. `wherewefail.md`
+      interaction-gated item flipped 🔴→🟡 (mitigated).
+
+13. *(Cloudflare fallback)* "gingerpeople.com returns 403 (challenge). Add a stealth
+    Playwright fallback like my notes; tell me what's relevant, plan, then do it."
+    - Outcome (no execution): D22. Root cause = our UA literally said 'QosmicAuditBot'
+      (auto-blocked) + httpx pre-flight gave up before the browser tried. Fixed:
+      realistic UA, lightweight stealth (automation flags + init-script patches +
+      locale/tz), and browser gate-escalation (httpx challenged → stealth browser
+      re-probe → full browser discovery via `seed_surfaces` if it passes, else honest
+      blocked/dead). Added `--proxy` + `--no-stealth`. wherewefail Cloudflare → 🟡.
+
+14. *(zenrojas run debrief)* "Why did the first agent take so long — only the
+    summary? And why the errors in generating the report?"
+    - Answers: (1) the long block was the REASON phase (vision screenshots + large
+      HTML + generating 13 experiments), not the summary. (2) Errors were inline
+      `python -c` PowerShell quoting + qcrawl import-path from repo root — not
+      harness logic; the pipeline produced 10 valid experiments + valid synth.
+    - Fix (D23): added `tools/select.py` + `tools/synth_check.py`; skills now call
+      these CLIs instead of inline Python; playbook filenames documented lowercase.
+
 *(append new prompts here as the build proceeds)*
 
 ## 3. Agent-drove vs. took-the-wheel

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QosmicExperiment",
+  "description": "One proposed CRO experiment. Pillar agents emit a JSON array of these (structured output). Validated by tools/qcrawl/experiments.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title", "pillar", "surface", "url", "evidence", "hypothesis",
+    "primary_change", "primary_kpi", "decision_rule", "expected_lift", "confidence"
+  ],
+  "properties": {
+    "exp_id": {
+      "type": "string",
+      "pattern": "^exp-[0-9a-f]{12}$",
+      "description": "Stable id; generate via experiments.make_exp_id(title, url) if absent."
+    },
+    "title": { "type": "string", "minLength": 4 },
+    "pillar": {
+      "type": "string",
+      "enum": ["Conversion", "AOV", "Retention", "Acquisition", "Performance"]
+    },
+    "surface": { "type": "string", "description": "Affected surface, e.g. 'GIN GINS PDP'." },
+    "url": { "type": "string", "description": "URL of the affected surface (may be a new path)." },
+    "evidence": {
+      "type": "string",
+      "description": "An artifact path (pages/.../screenshot.png or .../page.html) or a URL. NEVER prose."
+    },
+    "hypothesis": { "type": "string", "minLength": 10 },
+    "primary_change": { "type": "string", "minLength": 5 },
+    "primary_kpi": { "type": "string" },
+    "decision_rule": { "type": "string", "description": "Ship condition, e.g. 'Ship if KPI improves without hurting bounce.'" },
+    "expected_lift": { "type": "string", "description": "A range, e.g. '+8–14%'." },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Percent. Used to sort/select; calibrate honestly within your pillar."
+    }
+  }
+}

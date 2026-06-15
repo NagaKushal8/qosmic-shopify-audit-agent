@@ -171,6 +171,224 @@
 - **Tests:** `tools/tests/test_health.py` covers hard/soft 404, 5xx, connection
   failure, healthy, password gate, retry-then-recover, and all-dead assessment.
 
+## D12 — Generation (Reason) architecture: digest-first, signals pre-extracted, HTML on demand  *(LOCKED)*
+- **Status:** Locked · 2026-06-14
+- **Decision:** The Reason phase does NOT pass raw HTML to the reasoning agents by
+  default. Instead:
+  1. A deterministic **digest builder** (`tools/qcrawl/digest.py`) reads a run's
+     `manifest.json` + saved `page.html`/`meta.json` and **pre-extracts a small set
+     of CRO signals** per page (e.g. price present? add-to-cart? reviews? variant
+     selector? CTA count? empty-cart? email capture? trust badges?).
+  2. A **preset Shopify surface→pillar map** (`tools/qcrawl/pillars.py`) tags each
+     page with its 1–3 likely pillars. **Pillars live in the manifest/digest as
+     structured fields — NOT encoded in filenames** (many-to-many + rename churn
+     make filenames brittle). Folder names stay category-rich for human skim.
+  3. Routing is **deterministic** (read the `pillars` field) → a per-pillar index
+     (`digest/<pillar>.md`) is the artifact handed to each pillar agent.
+  4. **5 pillar agents** (Conversion / AOV / Retention / Acquisition / Performance)
+     each reason over their routed digest slice + **screenshots**; they **pull full
+     `page.html` on demand** (the agent's Read tool) only when they need proof.
+  5. **Two-pass self-correction:** Pass 1 = generate experiments from the routed
+     slice. Pass 2 = each agent skims the full lightweight index, flags
+     misclassified / cross-relevant pages, pulls only those, and refines.
+  6. A **reduce/orchestrator** step dedupes overlapping experiments and enforces the
+     final budget (10 experiments, balanced ≈2 per pillar).
+- **Reasoning:** Capability isn't the issue — an LLM *can* read HTML. But raw
+  Shopify HTML is 150k–400k chars/page; ×30 pages ×5 agents is huge, noisy, and
+  non-reproducible. Pre-extracted signals are cheap, **deterministic** (same answer
+  every run), and **eval-verifiable** (a fact the eval can check, closing the
+  hallucination gap). The screenshot already carries most of what's needed to
+  *reason*; the digest makes a few key facts exact + checkable. HTML-on-demand keeps
+  the door open for depth without paying for it every time. Deterministic routing
+  (preset map) needs no LLM; the two-pass + on-demand fetch absorbs the preset's
+  approximation.
+
+## D13 — Capture cap raised 15 → 30  *(LOCKED)*
+- **Status:** Locked · 2026-06-14
+- **Decision:** `--max-capture` default 15→30, `--max-fetch` 40→60, per-category
+  caps bumped (sum ~35) so 30 is the binding limit.
+- **Reasoning:** User direction — 15 pages is too thin for a representative audit;
+  30 gives the pillar agents more surface coverage while caps still bound huge stores.
+
+## D14 — Digest is a separate, non-destructive step; reduce = deterministic guardrails + agent synthesis  *(LOCKED)*
+- **Status:** Locked · 2026-06-14
+- **Decision:**
+  - **Digest is a separate command** (`python tools/digest.py evidence/<run>/`), not
+    folded into crawl. It **never mutates raw evidence** — it reads
+    `manifest.json` + `page.html`/`meta.json` and writes NEW files under
+    `evidence/<run>/digest/` (`digest.json`, per-pillar `<pillar>.md`, `summary.md`).
+  - **Reduce** = a thin **deterministic validator** (`tools/qcrawl/experiments.py`:
+    schema validation, exp-id generation/uniqueness, count=10, all-5-pillars,
+    ≈2/pillar) that guards an **agent-driven synthesis** (semantic dedupe + final
+    selection lives in the reason skill).
+- **Reasoning:** Separate digest = iterate signal logic offline without re-crawling,
+  clean separation (capture vs interpret), independently testable, idempotent, and
+  raw artifacts stay immutable for citation integrity. Reduce split = counts/coverage
+  are objective (Python), but dedupe/"which 10 are best" is semantic (agent); pair
+  them so the budget is enforced deterministically while quality stays agent-judged.
+
+## D15 — Open-ended generation + coverage-floor selection + structured outputs  *(LOCKED)*
+- **Status:** Locked · 2026-06-14 · refines D12's "≈2 per pillar"
+- **Decision:**
+  - Pillar agents generate **open-ended** experiment counts with a **hard ceiling of
+    4** each — not a fixed 2/pillar quota.
+  - **Selection** (`experiments.select_experiments`): Round 1 = top-1 by confidence
+    per pillar (guarantees all 5 represented); Round 2 = top-2 per pillar where
+    available; then **fill remaining slots to 10 from the highest-confidence global
+    leftovers**.
+  - **Structured outputs are mandatory:** pillar agents emit a **JSON array** matching
+    `schema/experiment.schema.json` (12 fields, `confidence` numeric 0–100). Enforced
+    by tool-use/structured-output where the runtime supports it, else schema-in-prompt
+    + deterministic validation (`validate_report_set`) + re-ask on failure.
+- **Reasoning:** A fixed quota manufactures weak experiments; open-ended + floor lets
+  real problem concentration show while still spanning all 5 pillars. Selection needs
+  a sortable numeric `confidence`, which *requires* structured output — you can't sort
+  or validate prose. Structured JSON also makes every experiment machine-checkable by
+  the eval system later.
+- **Caveat (logged in wherewefail):** `confidence` isn't calibrated *across* pillar
+  agents, so cross-pillar sorting in the fill step is noisy; the eval/judge phase can
+  normalize later.
+
+## D16 — Pillar specialization: one reason skill + 5 playbooks (Option B)  *(LOCKED)*
+- **Status:** Locked · 2026-06-14
+- **Decision:** Keep a single `reason` skill for shared mechanics (read slice →
+  screenshot → structured JSON → two-pass → select), and add five rich, tunable
+  **pillar playbooks** (`.claude/skills/reason/playbooks/{conversion,aov,retention,
+  acquisition,performance}.md`) injected per pass. Each playbook carries the
+  pillar's leak patterns, KPIs, which digest signals to weight, and hypothesis /
+  decision-rule templates.
+- **Reasoning:** Running one generic prompt 5× is a loop, not 5 specialists. We
+  already split the *data* per pillar; this splits the *prompt* per pillar too —
+  deep specialization with DRY mechanics and per-pillar tunability. Avoids the
+  duplication and relevance-invocation awkwardness of 5 full skills (rejected
+  option A).
+
+## D17 — Write = deterministic assembly, not an LLM writer  *(LOCKED)*
+- **Status:** Locked · 2026-06-14
+- **Decision:** No monolithic "writer" agent. The LLM produces *data*; Python
+  *assembles* the report. Per-run structured files in `report/`:
+  - `experiments.json` — LLM (reason agents)
+  - `summary.md` — **LLM** (executive-summary prose, via a small `synthesize` skill)
+  - `competitors.json` — **LLM** (competitor analysis, structured)
+  - `tech_checks.json` — **Python** (`tools/tech_checks.py`, deterministic from
+    evidence + light HTTP probes; finally builds the deferred T1.5 — and beats the
+    reference's "not inspected" Warns)
+  - `report.md` — **Python** (`tools/assemble.py`, templating to the
+    `target_report.md` structure; no LLM, no formatting drift)
+- **Reasoning:** Determinism where possible; LLM only where judgment/world-knowledge
+  is required (experiments, summary, competitors). Assembly is mechanical → make it
+  reproducible Python, which also guarantees the final structure can't drift.
+
+## D18 — Structured outputs everywhere until final assembly  *(LOCKED — guiding principle)*
+- **Status:** Locked · 2026-06-14
+- **Decision:** Every inter-stage handoff is a **validated structured artifact**
+  (JSON with a schema in `schema/`), all the way to the final stage. The ONLY
+  prose-rendered artifact is `report.md`, produced deterministically by `assemble.py`
+  from the structured files. Each LLM step (experiments, summary, competitors) emits
+  to its schema, validated before the next stage consumes it; re-ask on failure.
+- **Reasoning:** User priority — the final report structure is critical, so we
+  protect it by keeping data machine-checkable end-to-end and only rendering prose at
+  the very last, deterministic step. Structured-everywhere also makes every stage
+  eval-verifiable later.
+
+## D19 — Competitor = web-search only (no fabrication); honest-unavailable everywhere  *(LOCKED)*
+- **Status:** Locked · 2026-06-14
+- **Decision:**
+  - Competitor analysis uses **web search only** (option B). **No fallback to
+    pure-LLM world knowledge.** If no web-search tool is available, the section is
+    written as `status:"unavailable"` with an honest note — never fabricated.
+  - The executive summary likewise marks `status:"unavailable"` if it can't be
+    synthesized validly. `assemble.py` renders the honest note for any unavailable
+    section instead of inventing content.
+  - A deterministic **domain-verify guard** (`synth.verify_domains`) drops competitor
+    domains that don't resolve (kills hallucinated domains).
+  - Cached structured artifacts per run live in `evidence/<run>/report/`:
+    `experiments.json`, `summary.json`, `competitors.json`, `tech_checks.json`.
+    `tools/assemble.py` stitches them into `report.md` (target_report.md structure),
+    deterministically, every time, in fixed order.
+- **Reasoning:** User principle — fabricating competitors and shipping them is
+  dishonest; better to state plainly that the config couldn't produce a section.
+  Honest "unavailable" is recorded in `wherewefail.md`. Web-search grounding +
+  domain-verify is what makes competitor analysis generalize to unseen stores
+  without hallucinating.
+
+## D20 — Generic, research-backed pillar playbooks   *(LOCKED)*
+- **Status:** Locked · 2026-06-14 · refines D16
+- **Decision:** The 5 pillar playbooks are rewritten to be **generic and
+  framework-driven**, grounded in real CRO research (Baymard, NN/g, Google web.dev,
+  McKinsey, Klaviyo, Recharge, Smile.io, Ahrefs, Shopify, etc.). Each playbook =
+  mission · "how to think" (evidence-first, anti-overfit) · store-agnostic leak
+  patterns with on-page signals · diagnostic questions per surface · KPIs +
+  **labeled benchmarks** (authoritative vs rule-of-thumb) · lever library ·
+  hypothesis + decision-rule framing with guardrails · sources. The reason skill
+  gained a **reasoning-discipline** section (evidence-first not template-first, no
+  overfit, benchmark-anchored confidence, honest absence).
+- **Reasoning:** The earlier playbooks were overfit — they named the calibration
+  store and baked in its specific experiments, which would bias every audit and fail
+  to generalize. Open-ended, research-backed playbooks tell the LLM *how to
+  interrogate evidence* (and give real numbers to calibrate confidence/lift),
+  which is what makes the output defensible vs. "an LLM doing a vibe search."
+  Research gathered via 5 parallel web-research subagents; benchmarks labeled by
+  source quality so the LLM doesn't over-claim.
+
+## D21 — Interaction capture + tri-state signals (fix "confidently-wrong" absences)  *(LOCKED)*
+- **Status:** Locked · 2026-06-14
+- **Decision:** Two complementary fixes for the crawl's biggest credibility risk —
+  asserting a feature is "missing" when it's merely interaction-gated:
+  1. **Tri-state signals (Fix A):** interaction-dependent signals are
+     `present | absent | unverified` (not binary). `unverified` = never observed. The
+     reason skill forbids proposing a "missing X" experiment from an `unverified`
+     signal — downgrade or verify instead.
+  2. **Interaction capture (Fix B):** Playwright drives a few generic, best-effort
+     Shopify recipes during capture: **B1** add-to-cart → screenshot + DOM of the
+     **cart drawer** (where cross-sell / free-shipping bars live), and **B4**
+     screenshot-then-dismiss the **email popup/modal**. Artifacts: `drawer.png`,
+     `drawer.html`, `popup.png`. The digest turns these into verified tri-state
+     signals (`cart_cross_sell`, `cart_free_shipping_bar`, `email_popup`).
+- **Reasoning:** A static, logged-out, no-interaction snapshot can't see Shopify's
+  most important conversion surfaces (cart drawer, modal, mega-menu), so a binary
+  `absent` produces confidently-wrong "you're missing X" findings — the fastest way to
+  lose merchant trust. Capturing the interaction fixes the *data*; tri-state + the
+  skill rule fix the *epistemics*, so when a best-effort recipe fails (theme variance)
+  the worst case is "less complete," never "wrong." No order is ever placed
+  (add-to-cart only; checkout never completed).
+
+## D22 — Stealth + browser gate-escalation (Cloudflare / WAF fallback)  *(LOCKED)*
+- **Status:** Locked · 2026-06-14
+- **Decision:** Three changes so bot-protected stores don't dead-end the crawl:
+  1. **Realistic UA** — dropped the `QosmicAuditBot` tag from httpx + Playwright. A
+     *declared* bot is auto-blocked by WAFs; this was self-sabotage.
+  2. **Lightweight stealth** — Playwright launches with
+     `--disable-blink-features=AutomationControlled` and an init-script patching
+     `navigator.webdriver` / `window.chrome` / `navigator.languages` / `plugins`, plus
+     realistic locale/timezone. Default on (`--no-stealth` to disable).
+  3. **Browser gate-escalation** — when the httpx pre-flight is challenged
+     (Cloudflare always blocks JS-less httpx) or fails, we **re-probe with the stealth
+     browser** before concluding. If the browser passes → full browser-based discovery
+     (`seed_surfaces` from the rendered homepage). Only if the browser *also* fails →
+     honest `blocked:challenge` (homepage proof) or `dead`. Added `--proxy` passthrough
+     for IP-level blocks.
+- **Reasoning:** gingerpeople.com returned 403 on every page — partly because we
+  announced ourselves as a bot, and partly because the httpx gate gave up before the
+  real browser tried. Stealth + escalation gives the browser a fair shot; password
+  pages still aren't bypassed (real gate); and the honesty rule holds — a hard WAF
+  that beats stealth is reported as `blocked`, never fabricated. Stealth is applied to
+  audit storefronts the operator explicitly chose.
+
+## D23 — Ship CLIs for reduce/synth steps (no inline shell Python)  *(LOCKED)*
+- **Status:** Locked · 2026-06-14
+- **Decision:** Add `tools/select.py` (select + exp-ids + validate) and
+  `tools/synth_check.py` (domain-verify + validate competitors/summary). The reason
+  and synthesize skills now call these CLIs instead of suggesting inline
+  `python -c "..."`. Also documented playbook filenames as lowercase.
+- **Reasoning:** A real zenrojas.com run surfaced repeated failures where the agent
+  hand-wrote inline Python through PowerShell: quotes/f-strings/`%` broke the shell
+  (unterminated string / invalid syntax), and a temp script run from repo root hit
+  `ModuleNotFoundError: qcrawl` (our `pythonpath=tools` is pytest-only). The pipeline
+  logic was fine — the ergonomics weren't. CLIs that self-insert the path (like the
+  other `tools/*.py`) remove both failure modes and are cross-shell safe. (Pillar
+  playbook casing fixed for case-sensitive OS portability.)
+
 ## D3 — Eval system shape  *(OPEN — headline deliverable)*
 - **Status:** Open · 2026-06-14 · settle at start of Part 2
 - **Recommendation:** **Hybrid** — deterministic checks + LLM-judge rubric.

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QosmicCompetitorAnalysis",
+  "description": "Competitor analysis as structured data (D18). LLM + web-search grounded. If web search is unavailable, status=unavailable and we say so honestly — never fabricated.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "unavailable"],
+      "description": "'ok' if web-search-grounded; 'unavailable' if no web search/config — honest, no fabrication."
+    },
+    "note": {
+      "type": "string",
+      "description": "When status=unavailable, the honest reason shown in the report."
+    },
+    "intro": {
+      "type": "string",
+      "description": "One-line framing of how competitors make the job easier vs. this store's edge."
+    },
+    "competitors": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["competitor", "domain", "positioning", "what_they_make_easier", "store_edge", "pattern_to_adapt"],
+        "properties": {
+          "competitor": { "type": "string" },
+          "domain": { "type": "string", "description": "Real domain; verified to resolve by synth.verify_domains." },
+          "positioning": { "type": "string" },
+          "what_they_make_easier": { "type": "string" },
+          "store_edge": { "type": "string", "description": "Our store's edge — should reference our own digest evidence." },
+          "pattern_to_adapt": { "type": "string" },
+          "domain_resolves": { "type": "boolean", "description": "Set by the deterministic domain-verify guard." }
+        }
+      }
+    }
+  }
+}
