@@ -9,9 +9,13 @@ Two independent commands, never chained:
 - `evaluate evidence/<run>` → scores a finished report.
 
 ## Recordings
-- **Walkthrough (zenrojas.com):**
+- **Walkthrough (zenrojas.com):** 
 
-https://github.com/user-attachments/assets/803c69fd-b6cd-430b-908e-8c58cb751a5b
+https://github.com/user-attachments/assets/5d1f7d30-ceb2-41ba-80d4-cbc49a999ca9
+
+
+
+
 
 - **Audit  (zenrojas.com):** <img width="1727" height="530" alt="image" src="https://github.com/user-attachments/assets/56e75d9c-2086-467c-8690-1cda153a54d6" />
 
